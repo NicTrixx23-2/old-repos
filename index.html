@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Voice Controlled App</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      margin: 20px;
+      background: #f0f2f5;
+      color: #333;
+    }
+    h1 {
+      color: #4a4a4a;
+    }
+    button {
+      padding: 15px 30px;
+      font-size: 18px;
+      cursor: pointer;
+      background-color: #6B04A8;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      transition: background-color 0.3s ease;
+    }
+    button:hover {
+      background-color: #8c07d0;
+    }
+    #output {
+      margin-top: 20px;
+      font-size: 20px;
+      color: #4a4a4a;
+    }
+    svg {
+      width: 250px;
+      height: 250px;
+      margin-top: 20px;
+      display: none; /* Initially hidden */
+    }
+    #inner {
+      stroke-dasharray: 314 314;
+      stroke-dashoffset: 314;
+      transform: rotate(-90deg);
+      transform-origin: 50% 50%;
+      animation: animate 2s ease-in-out infinite;
+    }
+    @keyframes animate {
+      0%, 100% {
+        stroke-dashoffset: 314;
+      }
+      50% {
+        stroke-dashoffset: 0;
+      }
+      50.1% {
+        stroke-dashoffset: 628;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>Voice Controlled App</h1>
+  <button id="start-button">Start Voice Command</button>
+  <div id="output"></div>
+
+  <!-- SVG for animation -->
+  <svg id="listening-indicator">
+    <g class="circles">
+      <circle cx="125" cy="125" r="50" fill="none" stroke-width="15px" stroke="#E0E3E9"></circle>
+      <circle id="inner" cx="125" cy="125" r="50" fill="none" stroke-width="12px" stroke="#6B04A8"></circle>
+    </g>
+  </svg>
+
+  <!-- Audio for listening indication -->
+  <audio id="listening-sound" src="https://cdn.glitch.global/4c00f718-bec1-4fdf-bc90-50bc392f1746/listening.mp3?v=1722792331799"></audio>
+
+  <script>
+    const startButton = document.getElementById('start-button');
+    const outputDiv = document.getElementById('output');
+    const listeningIndicator = document.getElementById('listening-indicator');
+    const listeningSound = document.getElementById('listening-sound');
+    
+    let recognition;
+    let synth = window.speechSynthesis;
+
+    // Check if browser supports Speech Recognition
+    if (!('webkitSpeechRecognition' in window)) {
+      outputDiv.innerText = 'Speech Recognition API not supported in this browser.';
+      startButton.disabled = true;
+    } else {
+      recognition = new webkitSpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.interimResults = false;
+
+      recognition.onresult = event => {
+        const transcript = event.results[0][0].transcript.toLowerCase();
+        outputDiv.innerText = `You said: ${transcript}`;
+        handleCommand(transcript);
+      };
+
+      recognition.onerror = event => {
+        outputDiv.innerText = `Error occurred: ${event.error}`;
+        console.error('Recognition error:', event);
+      };
+
+      recognition.onend = () => {
+        outputDiv.innerText = 'Speech recognition ended.';
+        listeningIndicator.style.display = 'none'; // Hide SVG animation when not listening
+        listeningSound.pause();
+        listeningSound.currentTime = 0;
+      };
+
+      startButton.onclick = () => {
+        // Request microphone access
+        navigator.mediaDevices.getUserMedia({ audio: true })
+          .then(() => {
+            recognition.start();
+            outputDiv.innerText = 'Listening...';
+            listeningIndicator.style.display = 'block'; // Show SVG animation when listening
+            listeningSound.play();
+          })
+          .catch(error => {
+            outputDiv.innerText = 'Microphone access was denied or there was an error.';
+            console.error('Microphone access error:', error);
+          });
+      };
+    }
+
+    function handleCommand(command) {
+      let response = '';
+
+      if (command.includes('open website')) {
+        const url = command.split('open website ')[1];
+        openWebsite(url);
+        return;
+      } else if (command.includes('time')) {
+        const now = new Date();
+        response = `The time is ${now.toLocaleTimeString()}.`;
+      } else if (command.includes('weather in')) {
+        const location = command.split('weather in ')[1];
+        getWeather(location);
+        return;
+      } else if (command.includes('remind me to')) {
+        const reminder = command.split('remind me to ')[1];
+        setReminder(reminder);
+        return;
+      } else if (command.includes('calculate')) {
+        const expression = command.split('calculate ')[1];
+        calculate(expression);
+        return;
+      } else if (command.includes('date')) {
+        const today = new Date();
+        response = `Today's date is ${today.toDateString()}.`;
+      } else if (command.includes('joke')) {
+        tellJoke();
+        return;
+      } else if (command.includes('quote')) {
+        getQuote();
+        return;
+      } else if (command.includes('translate')) {
+        const textToTranslate = command.split('translate ')[1];
+        translate(textToTranslate);
+        return;
+      } else if (command.includes('recipe for')) {
+        const recipe = command.split('recipe for ')[1];
+        getRecipe(recipe);
+        return;
+      } else if (command.includes('spell')) {
+        const word = command.split('spell ')[1];
+        spellWord(word);
+        return;
+      } else {
+        response = "Sorry, I didn't understand that.";
+      }
+
+      outputDiv.innerText = response;
+      speak(response);
+    }
+
+    function speak(text) {
+      if (synth.speaking) {
+        console.error('Speech synthesis is already in progress.');
+        return;
+      }
+
+      if (text === '') {
+        console.error('No text provided for speech synthesis.');
+        return;
+      }
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.onend = () => {
+        console.log('SpeechSynthesisUtterance.onend');
+      };
+      utterance.onerror = (event) => {
+        console.error('SpeechSynthesisUtterance.onerror', event);
+      };
+
+      try {
+        synth.speak(utterance);
+      } catch (error) {
+        console.error('Error with speech synthesis:', error);
+      }
+    }
+
+    function openWebsite(url) {
+      if (!url.startsWith('http')) {
+        url = 'http://' + url;
+      }
+      window.open(url, '_blank');
+      const response = `Opening website ${url}.`;
+      outputDiv.innerText = response;
+      speak(response);
+    }
+
+    function getWeather(location) {
+      fetch(`https://api.openweathermap.org/data/2.5/weather?q=${location}&appid=e2666a0a839646bcccb73532e09a3689&units=metric`)
+        .then(response => response.json())
+        .then(data => {
+          const weather = `The weather in ${location} is ${data.weather[0].description} with a temperature of ${data.main.temp}°C.`;
+          outputDiv.innerText = weather;
+          speak(weather);
+        })
+        .catch(error => {
+          console.error('Error fetching weather:', error);
+          const errorMessage = 'Sorry, I could not fetch the weather information.';
+          outputDiv.innerText = errorMessage;
+          speak(errorMessage);
+        });
+    }
+
+    function setReminder(reminder) {
+      const reminderTime = parseInt(prompt('In how many minutes should I remind you?'));
+      if (!isNaN(reminderTime)) {
+        setTimeout(() => {
+          const reminderMessage = `Reminder: ${reminder}`;
+          outputDiv.innerText = reminderMessage;
+          speak(reminderMessage);
+        }, reminderTime * 60000);
+        const confirmation = `I will remind you to ${reminder} in ${reminderTime} minutes.`;
+        outputDiv.innerText = confirmation;
+        speak(confirmation);
+      } else {
+        const errorMessage = 'Sorry, that is not a valid time.';
+        outputDiv.innerText = errorMessage;
+        speak(errorMessage);
+      }
+    }
+
+    function calculate(expression) {
+      try {
+        const result = eval(expression);
+        const calculation = `The result of ${expression} is ${result}.`;
+        outputDiv.innerText = calculation;
+        speak(calculation);
+      } catch (error) {
+        console.error('Error calculating expression:', error);
+        const errorMessage = 'Sorry, I could not calculate that.';
+        outputDiv.innerText = errorMessage;
+        speak(errorMessage);
+      }
+    }
+
+    function tellJoke() {
+      const jokes = [
+        'Why don’t scientists trust atoms? Because they make up everything!',
+        'What do you get if you cross a cat with a dark horse? Kitty Perry.',
+        'Why did the scarecrow win an award? Because he was outstanding in his field!'
+      ];
+      const joke = jokes[Math.floor(Math.random() * jokes.length)];
+      outputDiv.innerText = joke;
+      speak(joke);
+    }
+
+    function getQuote() {
+      fetch('https://api.quotable.io/random')
+        .then(response => response.json())
+        .then(data => {
+          const quote = `${data.content} — ${data.author}`;
+          outputDiv.innerText = quote;
+          speak(quote);
+        })
+        .catch(error => {
+          console.error('Error fetching quote:', error);
+          const errorMessage = 'Sorry, I could not fetch a quote.';
+          outputDiv.innerText = errorMessage;
+          speak(errorMessage);
+        });
+    }
+
+    function translate(text) {
+      const targetLang = 'es'; // Change target language code as needed
+      fetch(`https://api.mymemory.translated.net/get?q=${text}&langpair=en|${targetLang}`)
+        .then(response => response.json())
+        .then(data => {
+          const translation = data.responseData.translatedText;
+          const translationResult = `Translation: ${translation}`;
+          outputDiv.innerText = translationResult;
+          speak(translationResult);
+        })
+        .catch(error => {
+          console.error('Error fetching translation:', error);
+          const errorMessage = 'Sorry, I could not fetch the translation.';
+          outputDiv.innerText = errorMessage;
+          speak(errorMessage);
+        });
+    }
+
+    function getRecipe(recipe) {
+      fetch(`https://api.spoonacular.com/recipes/complexSearch?query=${recipe}&apiKey=f2d9a9d1068a4f3c8def2a7c5ffbffbf`)
+        .then(response => response.json())
+        .then(data => {
+          if (data.results && data.results.length > 0) {
+            const firstRecipe = data.results[0];
+            const recipeInfo = `Recipe for ${firstRecipe.title}: ${firstRecipe.sourceUrl}`;
+            outputDiv.innerText = recipeInfo;
+            speak(recipeInfo);
+          } else {
+            const noRecipe = 'Sorry, no recipes found for that query.';
+            outputDiv.innerText = noRecipe;
+            speak(noRecipe);
+          }
+        })
+        .catch(error => {
+          console.error('Error fetching recipe:', error);
+          const errorMessage = 'Sorry, I could not fetch the recipe.';
+          outputDiv.innerText = errorMessage;
+          speak(errorMessage);
+        });
+    }
+
+    function spellWord(word) {
+      const spelledOut = word.split('').join(' ');
+      const spellResult = `The spelling of ${word} is ${spelledOut}`;
+      outputDiv.innerText = spellResult;
+      speak(spellResult);
+    }
+  </script>
+</body>
+</html>
